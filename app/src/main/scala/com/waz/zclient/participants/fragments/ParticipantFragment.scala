@@ -95,8 +95,10 @@ class ParticipantFragment extends ManagerFragment
       case Some(_) => //no action to take, view was already set
       case _ =>
         (getStringArg(PageToOpenArg) match {
-          case Some(GuestOptionsFragment.Tag) => Future.successful((new GuestOptionsFragment, GuestOptionsFragment.Tag))
-          case Some(SingleParticipantFragment.TagDevices) => Future.successful((SingleParticipantFragment.newInstance(Some(SingleParticipantFragment.TagDevices)), SingleParticipantFragment.Tag))
+          case Some(GuestOptionsFragment.Tag) =>
+            Future.successful((new GuestOptionsFragment, GuestOptionsFragment.Tag))
+          case Some(SingleParticipantFragment.DevicesTab.str) =>
+            Future.successful((SingleParticipantFragment.newInstance(Some(SingleParticipantFragment.DevicesTab.str)), SingleParticipantFragment.Tag))
           case _ =>
             participantsController.isGroupOrBot.head.map {
               case true if getStringArg(UserToOpenArg).isEmpty => (GroupParticipantsFragment.newInstance(), GroupParticipantsFragment.Tag)
