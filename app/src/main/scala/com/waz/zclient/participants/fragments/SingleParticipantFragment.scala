@@ -192,6 +192,7 @@ class SingleParticipantFragment extends FragmentHelper {
     }
   }
 
+
   override def onCreateView(inflater: LayoutInflater, viewGroup: ViewGroup, savedInstanceState: Bundle): View =
     inflater.inflate(R.layout.fragment_participants_single_tabbed, viewGroup, false)
 
@@ -199,12 +200,14 @@ class SingleParticipantFragment extends FragmentHelper {
     super.onViewCreated(v, savedInstanceState)
 
     userHandle
+
     detailsView.foreach { view =>
       view.setLayoutManager(new LinearLayoutManager(ctx))
 
       (for {
         zms             <- inject[Signal[ZMessaging]].head
         user            <- participantsController.otherParticipant.head
+        _               <- zms.users.syncIfNeeded(Set(user.id))
         isGuest         = !user.isWireBot && user.isGuest(zms.teamId)
         rrVisible       <- userAccountsController.isTeam.head
         receiptsEnabled <- zms.propertiesService.readReceiptsEnabled.head
@@ -213,18 +216,14 @@ class SingleParticipantFragment extends FragmentHelper {
                              else R.string.read_receipts_info_title_disabled
                            ))
                            else None
-      } yield (user, isGuest, rrTitle)).foreach {
-        case (user, isGuest, rrTitle) =>
-          view.setAdapter(
-            new SingleParticipantAdapter(
-              user,
-              isGuest,
-              availability,
-              timerText,
-              rrTitle,
-              inject[ThemeController].isDarkTheme
-            )
-          )
+        isDarkTheme     <- inject[ThemeController].darkThemeSet.head
+      } yield (user.id, isGuest, rrTitle, isDarkTheme)).foreach {
+        case (userId, isGuest, rrTitle, isDarkTheme) =>
+          val adapter = new SingleParticipantAdapter(userId, isGuest, rrTitle, isDarkTheme)
+          participantsController.otherParticipant.map(_.fields).onUi(adapter.setFields)
+          availability.onUi(adapter.setAvailability)
+          timerText.onUi(adapter.setTimerText)
+          view.setAdapter(adapter)
       }
     }
 

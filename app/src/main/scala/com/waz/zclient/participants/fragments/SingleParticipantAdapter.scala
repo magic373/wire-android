@@ -22,25 +22,39 @@ import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.RecyclerView.ViewHolder
 import android.view.{LayoutInflater, View, ViewGroup}
 import android.widget.{ImageView, LinearLayout, TextView}
-import com.waz.model.{Availability, UserData, UserField, UserId}
-import com.waz.utils.events.{EventContext, Signal}
+import com.waz.model.{Availability, UserField, UserId}
 import com.waz.zclient.common.views.ChatheadView
 import com.waz.zclient.paintcode.GuestIcon
 import com.waz.zclient.ui.text.TypefaceTextView
 import com.waz.zclient.utils._
 import com.waz.zclient.views.ShowAvailabilityView
-import com.waz.zclient.{Injectable, Injector, R}
+import com.waz.zclient.{Injectable, R}
 
-class SingleParticipantAdapter(user: UserData,
+class SingleParticipantAdapter(userId: UserId,
                                isGuest: Boolean,
-                               availability: Signal[Option[Availability]],
-                               timerText: Signal[Option[String]],
                                readReceipts: Option[String],
-                               isDarkTheme: Boolean)
-                              (implicit context: Context, injector: Injector, eventContext: EventContext)
+                               isDarkTheme: Boolean,
+                               private var fields: Seq[UserField] = Seq.empty,
+                               private var availability: Option[Availability] = None,
+                               private var timerText: Option[String] = None
+                              )(implicit context: Context)
   extends RecyclerView.Adapter[ViewHolder] with Injectable {
   import SingleParticipantAdapter._
 
+  def setFields(fields: Seq[UserField]): Unit = {
+    this.fields = fields
+    notifyDataSetChanged()
+  }
+
+  def setAvailability(availability: Option[Availability]): Unit = {
+    this.availability = availability
+    notifyDataSetChanged()
+  }
+
+  def setTimerText(timerText: Option[String]): Unit = {
+    this.timerText = timerText
+    notifyDataSetChanged()
+  }
 
   override def onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder = viewType match {
     case Header =>
@@ -56,19 +70,19 @@ class SingleParticipantAdapter(user: UserData,
 
   override def onBindViewHolder(holder: ViewHolder, position: Int): Unit = (holder, position) match {
     case (h: ParticipantHeaderRowViewHolder, _) =>
-      h.bind(user.id, isGuest, availability, timerText, isDarkTheme, user.fields.nonEmpty)
+      h.bind(userId, isGuest, availability, timerText, isDarkTheme, fields.nonEmpty)
     case (h: ParticipantFooterRowViewHolder, _) =>
       h.bind(readReceipts)
     case (h: CustomFieldRowViewHolder, _) =>
-      h.bind(user.fields(position - 1))
+      h.bind(fields(position - 1))
   }
 
-  override def getItemCount: Int = user.fields.size + 2
+  override def getItemCount: Int = fields.size + 2
 
   override def getItemId(position: Int): Long =
     if (position == 0) 0L
     else if (position == getItemCount - 1) 1L
-    else user.fields(position - 1).key.hashCode.toLong
+    else fields(position - 1).key.hashCode.toLong
 
   setHasStableIds(true)
 
@@ -95,38 +109,37 @@ object SingleParticipantAdapter {
 
     def bind(userId: UserId,
              isGuest: Boolean,
-             availability: Signal[Option[Availability]],
-             timerText: Signal[Option[String]],
+             availability: Option[Availability],
+             timerText: Option[String],
              isDarkTheme: Boolean,
              hasInformation: Boolean
-            )(implicit context: Context, ec: EventContext): Unit =
-      if (!this.userId.contains(userId)){
-        this.userId = Some(userId)
+            )(implicit context: Context): Unit = {
+      this.userId = Some(userId)
 
-        imageView.setUserId(userId)
-        guestIndication.setVisible(isGuest)
+      imageView.setUserId(userId)
+      guestIndication.setVisible(isGuest)
 
-        val color = if (isDarkTheme) R.color.wire__text_color_primary_dark_selector else R.color.wire__text_color_primary_light_selector
-        guestIndicatorIcon.setImageDrawable(GuestIcon(color))
+      val color = if (isDarkTheme) R.color.wire__text_color_primary_dark_selector else R.color.wire__text_color_primary_light_selector
+      guestIndicatorIcon.setImageDrawable(GuestIcon(color))
 
-        availability.onUi {
-          case Some(av) =>
-            userAvailability.setVisible(true)
-            userAvailability.set(av)
-          case None =>
-            userAvailability.setVisible(false)
-        }
-
-        timerText.onUi {
-          case Some(text) =>
-            guestIndicatorTimer.setVisible(true)
-            guestIndicatorTimer.setText(text)
-          case None =>
-            guestIndicatorTimer.setVisible(false)
-        }
-
-        informationText.setVisible(hasInformation)
+      availability match {
+        case Some(av) =>
+          userAvailability.setVisible(true)
+          userAvailability.set(av)
+        case None =>
+          userAvailability.setVisible(false)
       }
+
+      timerText match {
+        case Some(text) =>
+          guestIndicatorTimer.setVisible(true)
+          guestIndicatorTimer.setText(text)
+        case None =>
+          guestIndicatorTimer.setVisible(false)
+      }
+
+      informationText.setVisible(hasInformation)
+    }
   }
 
   case class CustomFieldRowViewHolder(view: View) extends ViewHolder(view) {
